@@ -14,6 +14,23 @@ const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// Ensure DB connection for each API request (handles cold starts)
+let dbInitPromise;
+async function ensureDb() {
+  if (!dbInitPromise) {
+    dbInitPromise = dbConnection(process.env.MONGO_URI);
+  }
+  return dbInitPromise;
+}
+app.use(async (req, res, next) => {
+  try {
+    await ensureDb();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Root route (serves index.html)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -22,17 +39,11 @@ app.get('/', (req, res) => {
 // API routes
 app.use('/api/v1/tasks', taskRouter);
 
-// Ensure DB connection once (serverless cold start safe)
-let dbInitPromise;
-async function ensureDb() {
-  if (!dbInitPromise) {
-    dbInitPromise = dbConnection(process.env.MONGO_URI);
-  }
-  return dbInitPromise;
-}
-
-// Pre-warm connection (non-blocking)
-ensureDb().catch((err) => console.error('DB init error:', err));
+// Basic error handler
+app.use((err, req, res, next) => {
+  console.error('Request error:', err);
+  res.status(500).json({ msg: 'Server error', error: err.message });
+});
 
 // Export Express app for Vercel serverless
 module.exports = app;
