@@ -6,8 +6,13 @@ const taskRouter = require('./routes/tasks');
 const dbConnection = require('./db-connection/connect');
 
 // Middleware
-app.use(express.static("./public"));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+// Root route (serve index.html)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 app.use('/api/v1/tasks', taskRouter);
 
