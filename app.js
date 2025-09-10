@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const taskRouter = require('./routes/tasks');
 const dbConnection = require('./db-connection/connect');
+const mongoose = require('mongoose');
 
 // Load env vars locally; on Vercel, use Project Settings -> Environment Variables
 if (process.env.NODE_ENV !== 'production') {
@@ -34,6 +35,15 @@ app.use(async (req, res, next) => {
 // Root route (serves index.html)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health check to debug Vercel connectivity
+app.get('/api/v1/health', (req, res) => {
+  res.json({
+    nodeEnv: process.env.NODE_ENV,
+    hasMongoUri: Boolean(process.env.MONGO_URI),
+    dbState: mongoose.connection.readyState // 0=disconnected,1=connected,2=connecting,3=disconnecting
+  });
 });
 
 // API routes
