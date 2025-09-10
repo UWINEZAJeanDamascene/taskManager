@@ -1,37 +1,38 @@
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const express = require('express');
-const app = express();
+const path = require('path');
 const taskRouter = require('./routes/tasks');
 const dbConnection = require('./db-connection/connect');
+
+// Load env vars locally; on Vercel, use Project Settings -> Environment Variables
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+}
+
+const app = express();
 
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Root route (serve index.html)
+// Root route (serves index.html)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// API routes
 app.use('/api/v1/tasks', taskRouter);
 
-let isConnected = false;
-
-const connectDB = async () => {
-  if (isConnected) return;
-  try {
-    await dbConnection(process.env.MONGO_URI);
-    isConnected = true;
-    console.log('Connected to MongoDB');
-  } catch (error) {
-    console.log('Error connecting to the database', error);
-    throw error;
+// Ensure DB connection once (serverless cold start safe)
+let dbInitPromise;
+async function ensureDb() {
+  if (!dbInitPromise) {
+    dbInitPromise = dbConnection(process.env.MONGO_URI);
   }
-};
+  return dbInitPromise;
+}
 
-// Initialize DB connection
-connectDB();
+// Pre-warm connection (non-blocking)
+ensureDb().catch((err) => console.error('DB init error:', err));
 
-// Export for Vercel
+// Export Express app for Vercel serverless
 module.exports = app;
